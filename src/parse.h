@@ -114,6 +114,7 @@ struct EndTaskNodesAction
 
 typedef struct
 {
+		char *queue;
 		time_t tm;
 		LogEntryType type;
 		union {
@@ -132,8 +133,10 @@ typedef struct
 		};
 } LogEntry;
 
-LogEntry* parse_string (char *str);
-void print_log_entry (LogEntry *entry);
-void destroy_log_entry (LogEntry *entry);
+LogEntry* parse_string (char*);
+
+void print_log_entry (LogEntry*);
+
+void destroy_log_entry (LogEntry*);
 
 #endif

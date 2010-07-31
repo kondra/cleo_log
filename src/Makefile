@@ -1,8 +1,8 @@
 #EXES = $(basename $(wildcard *.c))
 CC = gcc
-CFLAGS = -Wall -O2
+CFLAGS = -Wall
 
-OBJ = main.o parse.o process.o
+OBJ = main.o parse.o process.o hash.o array.o
 
 TARGET = main
 
@@ -12,7 +12,7 @@ TARGET = main
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) $(OBJ) -o $(TARGET)
 
-process.o: parse.o
+process.o: parse.o hash.o array.o
 main.o: process.o
 
 clean:

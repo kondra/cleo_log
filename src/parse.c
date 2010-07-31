@@ -6,17 +6,29 @@
 #include "parse.h"
 
 static time_t get_time_from_string (char *str);
+
 static void get_view_request (char *str, LogEntry *entry);
+
 static void get_add_request (char *str, LogEntry *entry);
+
 static void get_added_action (char *str, LogEntry *entry);
+
 static void get_del_request (char *str, LogEntry *entry);
+
 static void get_pri_request (char *str, LogEntry *entry);
+
 static void get_block_pe_request (char *str, LogEntry *entry);
+
 static void get_block_request (char *str, LogEntry *entry);
+
 static void get_stat_request (char *str, LogEntry *entry);
+
 static void get_run_action (char *str, LogEntry *entry);
+
 static void get_run_nodes_action (char *str, LogEntry *entry);
+
 static void get_end_task_action (char *str, LogEntry *entry);
+
 static void get_end_task_nodes_action (char *str, LogEntry *entry);
 
 static const char *LogEntryString[] =
@@ -454,7 +466,7 @@ static void get_end_task_action (char *str, LogEntry *entry)
 				str++;
 		str++;
 		sscanf (str, "%ld:%ld:%ld", &hh, &mm, &ss);
-		entry->tm = hh * 3600 + mm * 60 + ss;
+		entry->end_task_act.tm = hh * 3600 + mm * 60 + ss;
 }
 
 static void get_end_task_nodes_action (char *str, LogEntry *entry)
@@ -477,12 +489,19 @@ static void get_end_task_nodes_action (char *str, LogEntry *entry)
 
 LogEntry* parse_string (char *str)
 {
-		int i, len;
-		char *p;
+		int i, len, q_len;
+		char *p, *q_begin;
 		char *str2 = str;
 
 		while (*str != ']')
 				str++;
+
+		//queue name
+		q_begin = str = str + 2;
+		while (*str != ' ')
+				str++;
+		q_len = str - q_begin;
+
 		while (*str != ':')
 				str++;
 		p = ++str;
@@ -501,7 +520,13 @@ LogEntry* parse_string (char *str)
 
 		LogEntry *entry = (LogEntry*) malloc (sizeof (LogEntry));
 		entry->tm = get_time_from_string (str2);
+
+		entry->queue = (char*) malloc (sizeof (char) * (q_len + 1));
+		strncpy (entry->queue, q_begin, q_len);
+		entry->queue[q_len] = 0;
+
 		entry->type = i;
+
 		switch (i)
 		{
 				case VIEW:
@@ -562,6 +587,7 @@ void print_log_entry (LogEntry *entry)
 						printf ("NP: %d\ntask_with_args: %s\n\n", entry->add_req.np, entry->add_req.task_with_args);
 						return;
 				case ADDED:
+						printf ("ADDED:\n");
 						printf ("id: %d\nparent: %s\nuser: %s\n", entry->added_act.id, entry->added_act.parent, entry->added_act.user);
 						printf ("NP: %d\ntask_with_args: %s\n\n", entry->added_act.np, entry->added_act.task_with_args);
 						return;
