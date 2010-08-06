@@ -11,6 +11,7 @@ int main()
 		process_log (data, "../cleo-short.log");
 
     printf ("log processed\n");
+    print_queue (data->aqueue, P_QUEUE_NAME);
 
 		return 0;
 }
