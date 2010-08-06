@@ -11,5 +11,7 @@ int main()
 
     print_queue (data->aqueue, P_QUEUE_NAME);
 
+    print_users (data->auser, P_USER_NAME);
+
 		return 0;
 }
