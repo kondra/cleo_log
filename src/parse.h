@@ -133,10 +133,9 @@ typedef struct
 		};
 } LogEntry;
 
-LogEntry* parse_string (char*);
-
-void print_log_entry (LogEntry*);
-
-void destroy_log_entry (LogEntry*);
+time_t get_time_from_string (char *str);
+LogEntry* parse_string (char *str);
+void print_log_entry (LogEntry *entry);
+void destroy_log_entry (LogEntry *entry);
 
 #endif
