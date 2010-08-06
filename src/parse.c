@@ -5,31 +5,9 @@
 
 #include "parse.h"
 
-static time_t get_time_from_string (char *str);
-
-static void get_view_request (char *str, LogEntry *entry);
-
-static void get_add_request (char *str, LogEntry *entry);
-
-static void get_added_action (char *str, LogEntry *entry);
-
-static void get_del_request (char *str, LogEntry *entry);
-
-static void get_pri_request (char *str, LogEntry *entry);
-
-static void get_block_pe_request (char *str, LogEntry *entry);
-
-static void get_block_request (char *str, LogEntry *entry);
-
-static void get_stat_request (char *str, LogEntry *entry);
-
-static void get_run_action (char *str, LogEntry *entry);
-
-static void get_run_nodes_action (char *str, LogEntry *entry);
-
-static void get_end_task_action (char *str, LogEntry *entry);
-
-static void get_end_task_nodes_action (char *str, LogEntry *entry);
+static int next_token (char **inp,  char bc,  char ec);
+static char* get_next_token (char **inp,  char bc,  char ec);
+static char* skip_to (char *str, char c);
 
 static const char *LogEntryString[] =
 {
@@ -74,11 +52,13 @@ static const char *Days[] =
 		"Sat"
 };
 
-static time_t get_time_from_string (char *str)
+time_t get_time_from_string (char *str)
 {
 		int i;
 
 		struct tm tp;
+
+    tp.tm_wday  = -1;
 
 		str++;
 		for (i = 0; i < 7; i++)
@@ -104,387 +84,52 @@ static time_t get_time_from_string (char *str)
 		return mktime (&tp);
 }
 
-static void get_view_request (char *str, LogEntry *entry)
+static int next_token (char **inp,  char bc,  char ec)
 {
-		int len;
-		char *p;
+    char *p;
+    char *str = *inp;
 
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->view_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->view_req.user, p, len);
-		entry->view_req.user[len] = 0;
+    int len;
 
-		p = str = str + 2;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->view_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->view_req.queue, p, len);
-		entry->view_req.queue[len] = 0;
+    while (*str != bc)
+        str++;
+    p = ++str;
+    while (*str != ec)
+        str++;
+
+    len = str - p;
+    *inp = p;
+
+    return len;
 }
 
-static void get_add_request (char *str, LogEntry *entry)
+static char* get_next_token (char **inp,  char bc,  char ec)
 {
-		int len;
-		char *p;
+    char *p, *res, *str = *inp;
+    int len;
 
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->add_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->add_req.user, p, len);
-		entry->add_req.user[len] = 0;
+    while (*str != bc)
+        str++;
+    p = ++str;
+    while (*str != ec)
+        str++;
 
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->add_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->add_req.queue, p, len);
-		entry->add_req.queue[len] = 0;
+    len = str - p;
+    *inp = str;
 
-		p = str = str + 2;
-		sscanf (str, "%d", &entry->add_req.np);
+    res = (char*) malloc (sizeof (char) * (len + 1));
+    strncpy (res,  p,  len);
+    res[len] = 0;
 
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->add_req.task_with_args = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->add_req.task_with_args, p, len);
-		entry->add_req.task_with_args[len] = 0;
+    return res;
 }
 
-static void get_added_action (char *str, LogEntry *entry)
+static char* skip_to (char *str, char c)
 {
-		int len;
-		char *p;
+    while (*str != c)
+        str++;
 
-		sscanf (str, "%d", &entry->added_act.id);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->added_act.parent = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->added_act.parent, p, len);
-		entry->added_act.parent[len] = 0;
-
-		//skip parent_id
-		str++;
-		while (*str != ';')
-				str++;
-
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->added_act.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->added_act.user, p, len);
-		entry->added_act.user[len] = 0;
-
-		p = str = str + 2;
-		sscanf (str, "%d", &entry->added_act.np);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->added_act.task_with_args = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->added_act.task_with_args, p, len);
-		entry->added_act.task_with_args[len] = 0;
-}
-
-static void get_del_request (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->del_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->del_req.user, p, len);
-		entry->del_req.user[len] = 0;
-
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->del_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->del_req.queue, p, len);
-		entry->del_req.queue[len] = 0;
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->del_req.id);
-}
-
-static void get_pri_request (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->pri_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->pri_req.user, p, len);
-		entry->pri_req.user[len] = 0;
-
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->pri_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->pri_req.queue, p, len);
-		entry->pri_req.queue[len] = 0;
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->pri_req.id);
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->pri_req.pri);
-}
-
-static void get_block_pe_request (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->block_pe_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->block_pe_req.user, p, len);
-		entry->block_pe_req.user[len] = 0;
-
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->block_pe_req.pe = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->block_pe_req.pe, p, len);
-		entry->block_pe_req.pe[len] = 0;
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->block_pe_req.block);
-}
-
-static void get_block_request (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->block_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->block_req.user, p, len);
-		entry->block_req.user[len] = 0;
-
-		p = str = str + 2;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->block_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->block_req.queue, p, len);
-		entry->block_req.queue[len] = 0;
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->block_req.id);
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->block_req.block);
-}
-
-static void get_stat_request (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->stat_req.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->stat_req.user, p, len);
-		entry->stat_req.user[len] = 0;
-
-		p = str = str + 2;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->stat_req.queue = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->stat_req.queue, p, len);
-		entry->stat_req.queue[len] = 0;
-}
-
-static void get_run_action (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		sscanf (str, "%d", &entry->run_act.id);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->run_act.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->run_act.user, p, len);
-		entry->run_act.user[len] = 0;
-
-		str += 2;
-		sscanf (str, "%d", &entry->run_act.np);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->run_act.task_with_args = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->run_act.task_with_args, p, len);
-		entry->run_act.task_with_args[len] = 0;
-}
-
-static void get_run_nodes_action (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		sscanf (str, "%d", &entry->run_nodes_act.id);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->run_nodes_act.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->run_nodes_act.user, p, len);
-		entry->run_nodes_act.user[len] = 0;
-
-		str += 2;
-		sscanf (str, "%d", &entry->run_nodes_act.np);
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->run_nodes_act.np_extra);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->run_nodes_act.nodes_list1 = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->run_nodes_act.nodes_list1, p, len);
-		entry->run_nodes_act.nodes_list1[len] = 0;
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->run_nodes_act.nodes_list2 = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->run_nodes_act.nodes_list2, p, len);
-		entry->run_nodes_act.nodes_list2[len] = 0;
-}
-
-static void get_end_task_action (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		sscanf (str, "%d", &entry->end_task_act.id);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != ';')
-				str++;
-		len = str - p;
-		entry->end_task_act.user = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->end_task_act.user, p, len);
-		entry->end_task_act.user[len] = 0;
-
-		str += 2;
-		sscanf (str, "%d", &entry->end_task_act.status);
-
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%d", &entry->end_task_act.sig);
-
-		time_t hh, mm, ss;
-		while (*str != ' ')
-				str++;
-		str++;
-		sscanf (str, "%ld:%ld:%ld", &hh, &mm, &ss);
-		entry->end_task_act.tm = hh * 3600 + mm * 60 + ss;
-}
-
-static void get_end_task_nodes_action (char *str, LogEntry *entry)
-{
-		int len;
-		char *p;
-
-		sscanf (str, "%d", &entry->end_task_nodes_act.id);
-
-		while (*str != ' ')
-				str++;
-		p = ++str;
-		while (*str != '\n')
-				str++;
-		len = str - p;
-		entry->end_task_nodes_act.nodes = (char*) malloc (sizeof (char) * (len + 1));
-		strncpy (entry->end_task_nodes_act.nodes, p, len);
-		entry->end_task_nodes_act.nodes[len] = 0;
+    return ++str;
 }
 
 LogEntry* parse_string (char *str)
@@ -493,32 +138,31 @@ LogEntry* parse_string (char *str)
 		char *p, *q_begin;
 		char *str2 = str;
 
-		while (*str != ']')
-				str++;
+    //skip time
+    str = skip_to (str, ']');
 
 		//queue name
-		q_begin = str = str + 2;
-		while (*str != ' ')
-				str++;
-		q_len = str - q_begin;
+    q_len = next_token (&str,  ' ',  ' ');
+		q_begin = str;
+    str += q_len;
 
-		while (*str != ':')
-				str++;
-		p = ++str;
-		while (*str != ' ')
-				str++;
-		len = str - p;
+    //command name
+    len = next_token (&str, ':',  ' ');
+    p = str;
+    str += len;
 
 		for (i = 0; i < NUM; i++)
-				if (strncmp (p, LogEntryString[i], str - p) == 0)
+				if (strncmp (p, LogEntryString[i], len) == 0)
 						break;
 
 		if (i == VIEW)
 				return NULL;
 
+    //skip ' '
 		str++;
 
 		LogEntry *entry = (LogEntry*) malloc (sizeof (LogEntry));
+
 		entry->tm = get_time_from_string (str2);
 
 		entry->queue = (char*) malloc (sizeof (char) * (q_len + 1));
@@ -531,40 +175,128 @@ LogEntry* parse_string (char *str)
 		{
 				case VIEW:
 						return NULL;
-//						get_view_request (str, entry);
+//            entry->view_req.user = get_next_token (&str,  ' ',  ';');
+//            entry->view_req.queue = get_next_token (&str,  ' ',  '\n');
+//
 //						return entry;
 				case ADD:
-						get_add_request (str, entry);
+            entry->add_req.user = get_next_token (&str,  ' ',  ';');
+            entry->add_req.queue = get_next_token (&str,  ' ',  ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->add_req.np);
+
+            entry->add_req.task_with_args = get_next_token (&str,  ' ',  '\n');
+
 						return entry;
 				case ADDED:
-						get_added_action (str, entry);
+            sscanf (str, "%d", &entry->added_act.id);
+
+            entry->added_act.parent = get_next_token (&str,  ' ',  ';');
+
+            //skip parent_id
+            str++;
+            while (*str != ';')
+                str++;
+
+            entry->added_act.user = get_next_token (&str,  ' ',  ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->added_act.np);
+
+            entry->added_act.task_with_args = get_next_token (&str,  ' ',  '\n');
+
 						return entry;
 				case DEL:
-						get_del_request (str, entry);
+            entry->del_req.user = get_next_token (&str,  ' ',  ';');
+            entry->del_req.queue = get_next_token (&str,  ' ',  ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->del_req.id);
+
 						return entry;
 				case PRI:
-						get_pri_request (str, entry);
+            entry->pri_req.user = get_next_token (&str, ' ', ';');
+            entry->pri_req.queue = get_next_token (&str, ' ', ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->pri_req.id);
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->pri_req.pri);
+
 						return entry;
 				case BLOCK:
-						get_block_request (str, entry);
+            entry->block_req.user = get_next_token (&str, ' ', ';');
+            entry->block_req.queue = get_next_token (&str, ' ', ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->block_req.id);
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->block_req.block);
+
 						return entry;
 				case BLOCK_PE:
-						get_block_pe_request (str, entry);
+            entry->block_pe_req.user = get_next_token (&str, ' ', ';');
+            entry->block_pe_req.pe = get_next_token (&str, ' ', ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->block_pe_req.block);
+
 						return entry;
 				case STAT:
-						get_stat_request (str, entry);
+            entry->stat_req.user = get_next_token (&str, ' ', ';');
+            entry->stat_req.queue = get_next_token (&str, ' ', '\n');
+
 						return entry;
 				case RUN:
-						get_run_action (str, entry);
+            sscanf (str, "%d", &entry->run_act.id);
+
+            entry->run_act.user = get_next_token (&str, ' ', ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->run_act.np);
+
+            entry->run_act.task_with_args = get_next_token (&str, ' ', '\n');
+
 						return entry;
 				case RUN_NODES:
-						get_run_nodes_action (str, entry);
+            sscanf (str, "%d", &entry->run_nodes_act.id);
+
+            entry->run_nodes_act.user = get_next_token (&str, ' ',  ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->run_nodes_act.np);
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->run_nodes_act.np_extra);
+
+            entry->run_nodes_act.nodes_list1 = get_next_token (&str, ' ', ';');
+            entry->run_nodes_act.nodes_list2 = get_next_token (&str, ' ', '\n');
+
 						return entry;
 				case END_TASK:
-						get_end_task_action (str, entry);
+            sscanf (str, "%d", &entry->end_task_act.id);
+
+            entry->end_task_act.user = get_next_token (&str, ' ', ';');
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->end_task_act.status);
+
+            str = skip_to (str, ' ');
+            sscanf (str, "%d", &entry->end_task_act.sig);
+
+            time_t hh, mm, ss;
+            str = skip_to (str, ' ');
+            sscanf (str, "%ld:%ld:%ld", &hh, &mm, &ss);
+            entry->end_task_act.tm = hh * 3600 + mm * 60 + ss;
+
 						return entry;
 				case END_TASK_NODES:
-						get_end_task_nodes_action (str, entry);
+            sscanf (str, "%d", &entry->end_task_nodes_act.id);
+            entry->end_task_nodes_act.nodes = get_next_token (&str, ' ', '\n');
+
 						return entry;
 		}
 
