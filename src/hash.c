@@ -4,13 +4,10 @@
 
 #include "hash.h"
 
-static unsigned int hash_func (const char*, unsigned int);
-
-static unsigned int nearest_pow (unsigned int);
-
-static unsigned int fast_log (unsigned int);
-
-static unsigned int set_mask (unsigned int);
+static unsigned int hash_func (const char *str, unsigned int mod_mask);
+static unsigned int nearest_pow (unsigned int n);
+static unsigned int fast_log (unsigned int n);
+static unsigned int set_mask (unsigned int m);
 
 HashTable* hash_new (unsigned int size)
 {

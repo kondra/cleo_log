@@ -12,10 +12,8 @@ typedef struct
 		unsigned int col;
 } HashTable;
 
-HashTable* hash_new (unsigned int);
-
-void* hash_lookup (HashTable*, const char*);
-
-unsigned int hash_insert (HashTable*, const char*, void*);
+HashTable* hash_new (unsigned int size);
+void* hash_lookup (HashTable *hash, const char *str);
+unsigned int hash_insert (HashTable *hash, const char *str, void *data);
 
 #endif

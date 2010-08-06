@@ -3,7 +3,9 @@
 
 #include "array.h"
 
-static Array* array_resize (Array*);
+#define MIN_SIZE 16
+
+static Array* array_resize (Array *arr);
 
 Array* array_new (unsigned int len)
 {
