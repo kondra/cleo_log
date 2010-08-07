@@ -16,7 +16,8 @@ enum
         P_KILLED = 1 << 9,
         P_SUCCEDED = 1 << 10,
         P_UNSUCCEDED = 1 << 11,
-        P_WAIT_TIME = 1 << 12
+        P_WAIT_TIME = 1 << 12,
+        P_CPU_HOURS = 1 << 13
 };
 
 typedef struct
@@ -29,6 +30,7 @@ typedef struct
 		int sig;
 		int status;
 		int deleted;
+    long long cpu_hours;
 
 		time_t queue_add_time;
 		time_t run_time;
@@ -38,14 +40,14 @@ typedef struct
 typedef struct
 {
 		char *name;
-		long long total_time;
-		long long cpu_hours;
-        long long wait_time;
-        int killed;
-        int succeded;
-        int unsucceded;
-		int np;
-		int np_extra;
+    long long total_time;
+    long long cpu_hours;
+    long long wait_time;
+    int killed;
+    int succeded;
+    int unsucceded;
+    int np;
+    int np_extra;
 
 		Array *task; //Task
 } User;
