@@ -311,12 +311,7 @@ static void print_task (Task *cur_task, int mask)
         printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
     }
     if (mask & P_CPU_HOURS)
-    {
-        long long hh = cur_task->cpu_hours / 3600;
-        long long mm = (cur_task->cpu_hours % 3600) / 60;
-        long long ss = (cur_task->cpu_hours % 3600) % 60;
-        printf ("CPU hours: %lld:%.2lld:%.2lld\n", hh, mm, ss);
-    }
+        printf ("CPU hours: %.4lf\n", cur_task->cpu_hours / 3600);
 
     if (mask != 0)
         printf ("\n");
@@ -341,20 +336,15 @@ static void print_user (User *cur_user, int mask)
 
     if (mask & P_USER_NAME)
         printf ("Name: %s\n", cur_user->name);
-    if (mask & P_TOTAL_TIME)
-    {
-        long long hh = cur_user->total_time / 3600;
-        long long mm = (cur_user->total_time % 3600) / 60;
-        long long ss = (cur_user->total_time % 3600) % 60;
-        printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
-    }
+//    if (mask & P_TOTAL_TIME)
+//    {
+//        long long hh = cur_user->total_time / 3600;
+//        long long mm = (cur_user->total_time % 3600) / 60;
+//        long long ss = (cur_user->total_time % 3600) % 60;
+//        printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
+//    }
     if (mask & P_CPU_HOURS)
-    {
-        long long hh = cur_user->cpu_hours / 3600;
-        long long mm = (cur_user->cpu_hours % 3600) / 60;
-        long long ss = (cur_user->cpu_hours % 3600) % 60;
-        printf ("CPU hours: %lld:%.2lld:%.2lld\n", hh, mm, ss);
-    }
+        printf ("CPU hours: %.4lf\n", cur_user->cpu_hours / 3600);
     if (mask & P_WAIT_TIME)
     {
         long long hh = cur_user->wait_time / 3600;
@@ -362,10 +352,10 @@ static void print_user (User *cur_user, int mask)
         long long ss = (cur_user->wait_time % 3600) % 60;
         printf ("Total wait time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
     }
-    if (mask & P_NP)
-        printf ("NP: %d\n", cur_user->np);
-    if (mask & P_NP_EXTRA)
-        printf ("NP_extra: %d\n", cur_user->np_extra);
+//    if (mask & P_NP)
+//        printf ("NP: %d\n", cur_user->np);
+//    if (mask & P_NP_EXTRA)
+//        printf ("NP_extra: %d\n", cur_user->np_extra);
     if (mask & P_KILLED)
         printf ("killed tasks: %d\n", cur_user->killed);
     if (mask & P_SUCCEDED)
@@ -396,22 +386,17 @@ static void print_queue (Queue *cur_queue, int mask)
 
     if (mask & P_QUEUE_NAME)
         printf ("Name: %s\n", cur_queue->name);
-    if (mask & P_TOTAL_TIME)
-    {
-        long long hh = cur_queue->total_time / 3600;
-        long long mm = (cur_queue->total_time % 3600) / 60;
-        long long ss = (cur_queue->total_time % 3600) % 60;
-        printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
-    }
+//    if (mask & P_TOTAL_TIME)
+//    {
+//        long long hh = cur_queue->total_time / 3600;
+//        long long mm = (cur_queue->total_time % 3600) / 60;
+//        long long ss = (cur_queue->total_time % 3600) % 60;
+//        printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
+//    }
     if (mask & P_CPU_HOURS)
-    {
-        long long hh = cur_queue->cpu_hours / 3600;
-        long long mm = (cur_queue->cpu_hours % 3600) / 60;
-        long long ss = (cur_queue->cpu_hours % 3600) % 60;
-        printf ("CPU hours: %lld:%.2lld:%.2lld\n", hh, mm, ss);
-    }
-    if (mask & P_NP)
-        printf ("NP: %d\n", cur_queue->np);
+        printf ("CPU hours: %.4lf\n", cur_queue->cpu_hours / 3600);
+//    if (mask & P_NP)
+//        printf ("NP: %d\n", cur_queue->np);
 
     if (mask != 0)
         printf ("\n");
