@@ -4,12 +4,12 @@
 
 typedef struct
 {
-		void **data;
-		char **keys;
-		unsigned int size;
-		unsigned int mod_mask;
-		unsigned int m; // size == 2^m
-		unsigned int col;
+    void **data;
+    char **keys;
+    unsigned int size;
+    unsigned int mod_mask;
+    unsigned int m; // size == 2^m
+    unsigned int col;
 } HashTable;
 
 HashTable* hash_new (unsigned int size);

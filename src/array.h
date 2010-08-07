@@ -4,9 +4,9 @@
 
 typedef struct
 {
-		void **data;
-		unsigned int alloc;
-		unsigned int len;
+    void **data;
+    unsigned int alloc;
+    unsigned int len;
 } Array;
 
 Array* array_new (unsigned int len);
