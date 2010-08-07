@@ -147,12 +147,6 @@ int process_log (Data *data, const char *filename)
 				if (entry == NULL)
 						continue;
 
-        if (entry->type == END_TASK)
-        {
-            print_log_entry (entry);
-            exit (0);
-        }
-
 				switch (entry->type)
 				{
 						case ADDED:
