@@ -4,42 +4,42 @@
 
 enum
 {
-        P_USER_NAME = 1 << 0,
-        P_QUEUE_NAME = 1 << 1,
-        P_ID = 1 << 2,
-        P_NP = 1 << 3,
-        P_NP_EXTRA = 1 << 4,
-        P_SIGNAL = 1 << 5,
-        P_ADD_TIME = 1 << 6,
-        P_BEGIN_TIME = 1 << 7,
-        P_TOTAL_TIME = 1 << 8,
-        P_KILLED = 1 << 9,
-        P_SUCCEDED = 1 << 10,
-        P_UNSUCCEDED = 1 << 11,
-        P_WAIT_TIME = 1 << 12,
-        P_CPU_HOURS = 1 << 13
+    P_USER_NAME = 1 << 0,
+    P_QUEUE_NAME = 1 << 1,
+    P_ID = 1 << 2,
+    P_NP = 1 << 3,
+    P_NP_EXTRA = 1 << 4,
+    P_SIGNAL = 1 << 5,
+    P_ADD_TIME = 1 << 6,
+    P_BEGIN_TIME = 1 << 7,
+    P_TOTAL_TIME = 1 << 8,
+    P_KILLED = 1 << 9,
+    P_SUCCEDED = 1 << 10,
+    P_UNSUCCEDED = 1 << 11,
+    P_WAIT_TIME = 1 << 12,
+    P_CPU_HOURS = 1 << 13
 };
 
 typedef struct
 {
-		char* user;
-		int id;
-		char* queue;
-		int np;
-		int np_extra;
-		int sig;
-		int status;
-		int deleted;
+    char* user;
+    int id;
+    char* queue;
+    int np;
+    int np_extra;
+    int sig;
+    int status;
+    int deleted;
     long long cpu_hours;
 
-		time_t queue_add_time;
-		time_t run_time;
-		time_t total_run_time;
+    time_t queue_add_time;
+    time_t run_time;
+    time_t total_run_time;
 } Task;
 
 typedef struct
 {
-		char *name;
+    char *name;
     long long total_time;
     long long cpu_hours;
     long long wait_time;
@@ -49,29 +49,29 @@ typedef struct
     int np;
     int np_extra;
 
-		Array *task; //Task
+    Array *task; //Task
 } User;
 
 typedef struct 
 {
-		char *name;
-		long long total_time;
-		long long cpu_hours;
-		int np;
+    char *name;
+    long long total_time;
+    long long cpu_hours;
+    int np;
 
-		Array *task; //Task
-		Array *user; //User
+    Array *task; //Task
+    Array *user; //User
 } Queue;
 
 typedef struct
 {
-		HashTable *htask; //Task
-		HashTable *huser; //User
-		HashTable *hqueue; //Queue
+    HashTable *htask; //Task
+    HashTable *huser; //User
+    HashTable *hqueue; //Queue
 
-		Array *atask;
-		Array *auser;
-		Array *aqueue;
+    Array *atask;
+    Array *auser;
+    Array *aqueue;
 } Data;
 
 Data* data_new (int max_user, int max_task, int max_queue);
