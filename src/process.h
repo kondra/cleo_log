@@ -18,6 +18,8 @@ enum
     P_UNSUCCEDED = 1 << 11,
     P_WAIT_TIME = 1 << 12,
     P_CPU_HOURS = 1 << 13,
+    P_TOTAL_TASK = 1 << 14,
+    P_DELETED = 1 << 15,
 };
 
 typedef struct
@@ -46,6 +48,7 @@ typedef struct
     int killed;
     int succeded;
     int unsucceded;
+    int deleted;
     int np;
     int np_extra;
 
@@ -75,25 +78,16 @@ typedef struct
 } Data;
 
 Data* data_new (int max_user, int max_task, int max_queue);
+
 int process_log (Data *data, const char *filename);
+
 User* get_user (Data *data, const char *username);
 Queue* get_queue (Data *data, const char *queue);
+
 void print_tasks (Array *atask, int mask);
 void print_users (Array *auser, int mask);
 void print_queues (Array *aqueue, int mask);
-
-// Task filters
-Array* task_time_filter (Array *task, int b_time, int e_time);
-Array* task_run_time_filter (Array *task, int min_time, int max_time);
-Array* task_queue_filter (Array *task, Array *queue);
-Array* task_np_filter (Array *task, int min_np, int max_np);
-
-// User filters
-Array* user_total_time_filter (Array *users, long long min_time, long long max_time);
-Array* user_cpu_hours_filter (Array *users, long long min_time, long long max_time);
-
-// Queue filters
-Array* queue_total_time_filter (Array *queues, long long min_time, long long max_time);
-Array* queue_cpu_hours_filter (Array *queues, long long min_time, long long max_time);
+void print_queue (Queue *cur_queue, int mask);
+void print_user (User *cur_user, int mask);
 
 #endif
