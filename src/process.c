@@ -286,31 +286,36 @@ static void print_task (Task *cur_task, int mask)
     if (cur_task->deleted)
         return;
 
+    int unfinished = 0;
+    if (cur_task->total_run_time < 0)
+        unfinished = 1;
+
+    if (mask & P_ID)
+        printf ("ID: %d\n", cur_task->id);
+    if (unfinished)
+        printf ("unfinished\n");
     if (mask & P_USER_NAME)
         printf ("User: %s\n", cur_task->user);
     if (mask & P_QUEUE_NAME)
         printf ("Queue: %s\n", cur_task->queue);
-    if (mask & P_ID)
-        printf ("ID: %d\n", cur_task->id);
     if (mask & P_NP)
         printf ("NP: %d\n", cur_task->np);
     if (mask & P_NP_EXTRA)
         printf ("NP_extra: %d\n", cur_task->np_extra);
-    if (mask & P_SIGNAL)
+    if (mask & P_SIGNAL && !unfinished)
         printf ("Signal: %d\n", cur_task->sig);
-        printf ("Status: %d\n", cur_task->status);
     if (mask & P_ADD_TIME)
-        printf ("Add time: %ld\n", cur_task->queue_add_time);
+        printf ("Add time: %s", ctime (&(cur_task->queue_add_time)));
     if (mask & P_BEGIN_TIME)
-        printf ("Begin time: %ld\n", cur_task->run_time);
-    if (mask & P_TOTAL_TIME)
+        printf ("Begin time: %s", ctime (&(cur_task->run_time)));
+    if (mask & P_TOTAL_TIME && !unfinished)
     {
         long long hh = cur_task->total_run_time / 3600;
         long long mm = (cur_task->total_run_time % 3600) / 60;
         long long ss = (cur_task->total_run_time % 3600) % 60;
         printf ("Total time: %lld:%.2lld:%.2lld\n", hh, mm, ss);
     }
-    if (mask & P_CPU_HOURS)
+    if (mask & P_CPU_HOURS && !unfinished)
         printf ("CPU hours: %.4lf\n", cur_task->cpu_hours / 3600);
 
     if (mask != 0)
