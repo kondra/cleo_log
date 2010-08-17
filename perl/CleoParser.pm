@@ -30,12 +30,11 @@ our @EXPORT = qw(parse_log_record);
 sub parse_log_record {
     $_ = $_[0];
 
-    my ($time, $user, $queue, $np, $id, $signal, $status, $np_extra);
-
+    my %res;
     my %mounths = ("Jan", 0, "Feb", 1, "Mar", 2, "Apr", 3, "May", 4, "Jun", 5, "Jul", 6, "Aug", 7, "Sep", 8, "Oct", 9, "Nov", 10, "Dec", 11);
 
     if (/\[(\w+)\s(\w+)\s(\d+)\s(\d+):(\d+):(\d+)\s(\d+)\]/) {
-        $time = mktime($6, $5, $4, $3, $mounths{$2}, $7 - 1900, 0, 0, -1);
+        $res{TIME} = mktime($6, $5, $4, $3, $mounths{$2}, $7 - 1900, 0, 0, -1);
     }
 
     my $req_queue = $1 if ($_[0] =~ /\]\s(\w+)\s/);
@@ -43,37 +42,39 @@ sub parse_log_record {
     my @words = split /;\s|;;\s/, $_;
 
     my $msg_type = $1 if (/:([A-Za-z_0]+)\s/);
+    $res{MSG_TYPE} = $msg_type;
 
     if ($msg_type eq "ADD") {
-        $user = $1 if ($words[0] =~ /\s(\w+)$/);
-        $queue = $words[1];
-        $np = $words[2];
+        $res{USER} = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{QUEUE} = $words[1];
+        $res{NP} = $words[2];
     } elsif ($msg_type eq "ADDED") {
-        $id = $1 if ($words[0] =~ /\s(\w+)$/);
-        $queue = $words[1];
+        $res{id} = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{QUEUE} = $words[1];
         if (/;;/) {
-            $user = $words[2];
-            $np = $words[3];
+            $res{USER} = $words[2];
+            $res{NP} = $words[3];
         } else {
-            $user = $words[3];
-            $np = $words[4];
+            $res{USER} = $words[3];
+            $res{NP} = $words[4];
         }
     } elsif ($msg_type eq "DEL") {
-        $user = $1 if ($words[0] =~ /\s(\w+)$/);
-        $queue = $words[1];
-        chomp ($id = $words[2]);
+        $res{USER} = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{QUEUE} = $words[1];
+        chomp ($res{ID} = $words[2]);
     } elsif ($msg_type eq "RUN_NODES") {
-        $id = $1 if ($words[0] =~ /\s(\w+)$/);
-        $user = $words[1];
-        $np = $words[2];
-        $np_extra = $words[3];
+        $res{ID} = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{USER} = $words[1];
+        $res{NP} = $words[2];
+        $res{NP_EXTRA} = $words[3];
     } elsif ($msg_type eq "END_TASK0") {
-        $id = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{ID} = $1 if ($words[0] =~ /\s(\w+)$/);
     } elsif ($msg_type eq "END_TASK") {
-        $id = $1 if ($words[0] =~ /\s(\w+)$/);
-        $user = $words[1];
-        $status = $words[2];
-        $signal = $words[3];
+        $res{ID} = $1 if ($words[0] =~ /\s(\w+)$/);
+        $res{USER} = $words[1];
+        $res{STATUS} = $words[2];
+        $res{SIGNAL} = $words[3];
     }
+    return %res;
 }
 
