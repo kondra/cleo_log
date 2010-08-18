@@ -31,7 +31,15 @@ open LOG, '<', $LOG_file_name
 my $i = 0;
 
 while (<LOG>) {
-    parse_log_record $_;
+    my %data = parse_log_record $_;
+    $i++;
+    if ($data{MSG_TYPE} eq "RUN_NODES") {
+        print "message type: ", $data{MSG_TYPE}, "\n";
+        print "id: ", $data{ID}, "\n";
+        print "user: ", $data{USER}, "\n";
+        print "np: ", $data{NP}, "\n";
+        last;
+    }
 }
 
 close LOG
