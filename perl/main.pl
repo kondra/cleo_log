@@ -1,22 +1,4 @@
 #!/usr/bin/perl 
-#===============================================================================
-#
-#         FILE:  main.pl
-#
-#        USAGE:  ./main.pl  
-#
-#  DESCRIPTION:  main
-#
-#      OPTIONS:  ---
-# REQUIREMENTS:  ---
-#         BUGS:  ---
-#        NOTES:  ---
-#       AUTHOR:  Dmiry (), kondra2lp@gmail.com
-#      COMPANY:  CMC MSU
-#      VERSION:  0.1
-#      CREATED:  08/11/2010 04:51:36 PM
-#     REVISION:  ---
-#===============================================================================
 
 use strict;
 use warnings;
@@ -29,7 +11,7 @@ sub parse_log_record {
     my %res;
     my %mounths = ("Jan", 0, "Feb", 1, "Mar", 2, "Apr", 3, "May", 4, "Jun", 5, "Jul", 6, "Aug", 7, "Sep", 8, "Oct", 9, "Nov", 10, "Dec", 11);
 
-    if ($str =~ /\[(\w+)\s(\w+)\s(\d+)\s(\d+):(\d+):(\d+)\s(\d+)\]/) {
+    if ($str =~ /\[(\w+)\s(\w+)\s+(\d+)\s(\d+):(\d+):(\d+)\s(\d+)\]/) {
         $res{TIME} = mktime ($6, $5, $4, $3, $mounths{$2}, $7 - 1900, 0, 0, -1);
     }
 
@@ -40,11 +22,7 @@ sub parse_log_record {
     my $msg_type = $1 if ($str =~ /:([A-Za-z_]+[0]*)\s/);
     $res{MSG_TYPE} = $msg_type;
 
-    if ($msg_type eq "ADD") {
-        $res{USER} = $1 if ($words[0] =~ /\s(\w+)$/);
-        $res{QUEUE} = $words[1];
-        $res{NP} = $words[2];
-    } elsif ($msg_type eq "ADDED") {
+    if ($msg_type eq "ADDED") {
         $res{ID} = $1 if ($words[0] =~ /\s(\w+)$/);
         $res{QUEUE} = $words[1];
         if (/;;/) {
@@ -88,25 +66,44 @@ sub print_task {
     print "\tstatus: ", $cur_task->{STATUS}, "\n" if exists $cur_task->{STATUS} && $format =~ /%t/;
     print "\tnp: ", $cur_task->{NP}, "\n" if $format =~ /%n/;
     print "\tnp extra: ", $cur_task->{NP_EXTRA}, "\n" if exists $cur_task->{NP_EXTRA} && $format =~ /%x/;
-    print "\tadded time: ", $cur_task->{ADDED_TIME}, "\n" if $format =~ /%a/;
-    print "\tbegin time: ", $cur_task->{BEGIN_TIME}, "\n" if exists $cur_task->{BEGIN_TIME} && $format =~ /%b/;
-    print "\tend time: ", $cur_task->{END_TIME}, "\n" if exists $cur_task->{END_TIME} && $format =~ /%e/;
-    print "\n";
+    print "\tcpu hours: ", $cur_task->{CPU_HOURS}, "\n" if $format =~ /%c/;
+    print "\tadded time: ", ctime ($cur_task->{ADDED_TIME}) if $format =~ /%a/;
+    print "\tbegin time: ", ctime ($cur_task->{BEGIN_TIME}) if exists $cur_task->{BEGIN_TIME} && $format =~ /%b/;
+    print "\tend time: ", ctime ($cur_task->{END_TIME}) if exists $cur_task->{END_TIME} && $format =~ /%e/;
+    print "\n" if $format =~ /%[iqustnxabec]/;
+}
+
+sub print_stat {
+    my $stat = shift;
+    my $format = shift;
+
+    print "stat: \n";
+    printf "\tcpu hours: %.2lf\n", $stat->{CPU_HOURS} / 3600 if exists $stat->{CPU_HOURS} && $format =~ /%H/;
+    if (exists $stat->{WAIT_TIME} && $format =~ /%W/) {
+        my $hh = $stat->{WAIT_TIME} / 3600;
+        my $mm = ($stat->{WAIT_TIME} % 3600) / 60;
+        my $ss = ($stat->{WAIT_TIME} % 3600) % 60;
+        printf "\twait time: %02.0lf:%02.0lf:%02.0lf\n", $hh, $mm, $ss;
+    }
+    my $cnt = @{$stat->{TASKS}};
+    print "\ttotal task count: ", $cnt, "\n" if $format =~ /%A/;
+    print "\tsucceded tasks: ", $stat->{SUCCEDED}, "\n" if exists $stat->{SUCCEDED} && $format =~ /%S/;
+    print "\tunsucceded tasks: ", $stat->{UNSUCCEDED}, "\n" if exists $stat->{UNSUCCEDED} && $format =~ /%U/;
+    print "\tkilled tasks: ", $stat->{KILLED}, "\n" if exists $stat->{KILLED} && $format =~ /%K/;
 }
 
 sub print_users {
     my $all_users = shift;
     my $format = shift;
 
+    my $cnt = keys %{$all_users};
+    print "users count: $cnt\n";
+
     foreach my $cur_user (keys %{$all_users}) {
         my $user = $all_users->{$cur_user};
         print "user: $cur_user\n";
         if ($format =~ /%S/) {
-            print "stat: \n";
-            printf "\tcpu hours: %.2lf\n", $user->{CPU_HOURS} / 3600 if exists $user->{CPU_HOURS} && $format =~ /%H/;
-            print "\tsucceded tasks: ", $user->{SUCCEDED}, "\n" if exists $user->{SUCCEDED} && $format =~ /%S/;
-            print "\tunsucceded tasks: ", $user->{UNSUCCEDED}, "\n" if exists $user->{UNSUCCEDED} && $format =~ /%U/;
-            print "\tkilled tasks: ", $user->{KILLED}, "\n" if exists $user->{KILLED} && $format =~ /%K/;
+            print_stat $user, $format;
         }
         if ($format =~ /%T/) {
             print "tasks:\n";
@@ -120,15 +117,60 @@ sub print_users {
 
 sub print_queues {
     my $all_queues = shift;
+    my $format = shift;
+
+    my $cnt = keys %{$all_queues};
+    print "queues count: $cnt\n";
+
     foreach my $cur_queue (keys %{$all_queues}) {
         print "queue: $cur_queue\n";
         if ($format =~ /%T/) {
             print "tasks:\n";
             foreach my $cur_task (@{$all_queues->{$cur_queue}->{TASKS}}) {
-                print_task $cur_task;
+                print_task $cur_task, $format;
             }
         }
+        print "\n";
     }
+}
+
+sub collect_stat {
+    my $tasks = shift;
+    my %stat;
+
+    $stat{TASKS} = $tasks;
+    foreach my $cur_task (@$tasks) {
+        $stat{CPU_HOURS} += $cur_task->{CPU_HPURS};
+        $stat{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
+        $stat{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
+        $stat{KILLED}++ if ($cur_task->{SIGNAL});
+    }
+    return \%stat;
+}
+
+sub time_predicate {
+    return exists $_[0]->{BEGIN_TIME} && $_[0]->{BEGIN_TIME} >= $_[1] && $_[0]->{BEGIN_TIME} <= $_[2];
+}
+
+sub cpu_hours_predicate {
+    return exists $_[0]->{CPU_HOURS} && $_[0]->{CPU_HOURS} >= $_[1] && $_[0]->{CPU_HOURS} <= $_[2];
+}
+
+sub queue_predicate {
+    return exists $_[1]->{$_[0]->{QUEUE}};
+}
+
+sub user_predicate {
+    return exists $_[1]->{$_[0]->{USER}};
+}
+
+sub np_predicate {
+    return exists $_->{NP} && $_->{NP} >= $_[1] && $_->{NP} <= $_[2];
+}
+
+sub run_time_predicate {
+    return exists $_->{END_TIME} && exists $_->{BEGIN_TIME}
+            && ($_->{END_TIME} - $_->{BEGIN_TIME}) >= $_[1] && ($_->{END_TIME} - $_->{BEGIN_TIME}) <= $_[2];
 }
 
 sub process_log {
@@ -142,15 +184,21 @@ sub process_log {
     my %all_users;
 
     my $i = 0;
-
     while (<LOG>) {
+        $i++;
         my %cur_task;
         my %data = parse_log_record $_;
         if ($data{MSG_TYPE} eq "ADDED") {
             $cur_task{ID} = $data{ID};
             $cur_task{USER} = $data{USER};
             $cur_task{QUEUE} = $data{QUEUE};
-            $cur_task{NP} = $data{NP};
+# what is "1-as" "1-"
+            if ($data{NP} =~ /(\d+)-/) {
+                $cur_task{NP} = $1;
+            } else {
+                $cur_task{NP} = $data{NP};
+            }
+#
             $cur_task{ADDED_TIME} = $data{TIME};
 
             push @all_tasks, \%cur_task;
@@ -183,6 +231,9 @@ sub process_log {
                 my $cur_task = $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}};
                 $cur_task->{BEGIN_TIME} = $data{TIME};
                 $cur_task->{NP_EXTRA} = $data{NP_EXTRA};
+
+                my $cur_user = $all_users{$cur_task->{USER}};
+                $cur_user->{WAIT_TIME} += $cur_task->{BEGIN_TIME} - $cur_task->{ADDED_TIME};
             } else {
 #                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
             }
@@ -193,28 +244,21 @@ sub process_log {
                 $cur_task->{SIGNAL} = $data{SIGNAL};
                 $cur_task->{STATUS} = $data{STATUS};
 
+                my $ch = ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
+                $cur_task->{CPU_HOURS} = $ch;
+
                 my $cur_user = $all_users{$cur_task->{USER}};
-                $cur_user->{CPU_HOURS} += ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
-                $cur_user->{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
-                $cur_user->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
-                $cur_user->{KILLED}++ if ($cur_task->{SIGNAL});
-
                 my $cur_queue = $all_queues{$cur_task->{QUEUE}};
-                $cur_queue->{CPU_HOURS} += ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
-                $cur_queue->{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
-                $cur_queue->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
-                $cur_queue->{KILLED}++ if ($cur_task->{SIGNAL});
 
-                $i++;
+                $cur_user->{CPU_HOURS} += $ch;
+                $cur_queue->{CPU_HOURS} += $ch;
+
+                $cur_queue->{SUCCEDED}++, $cur_user->{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
+                $cur_queue->{UNSUCCEDED}++, $cur_user->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
+                $cur_queue->{KILLED}++, $cur_user->{KILLED}++ if ($cur_task->{SIGNAL});
             } else {
 #                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
             }
-        }
-
-        if ($i > 100) {
-            print_users \%all_users, "%H%S%T%i%q";
-#            print_queues \%all_queues;
-            last;
         }
     }
 
