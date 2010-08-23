@@ -3,6 +3,8 @@
 use strict;
 use warnings;
 
+use Storable qw(store retrieve);
+use YAML qw(Dump);
 use POSIX;
 
 sub parse_log_record {
@@ -66,7 +68,14 @@ sub print_task {
     print "\tstatus: ", $cur_task->{STATUS}, "\n" if exists $cur_task->{STATUS} && $format =~ /%t/;
     print "\tnp: ", $cur_task->{NP}, "\n" if $format =~ /%n/;
     print "\tnp extra: ", $cur_task->{NP_EXTRA}, "\n" if exists $cur_task->{NP_EXTRA} && $format =~ /%x/;
-    print "\tcpu hours: ", $cur_task->{CPU_HOURS}, "\n" if $format =~ /%c/;
+    print "\tcpu hours: ", $cur_task->{CPU_HOURS}, "\n" if exists $cur_task->{CPU_HOURS} && $format =~ /%c/;
+    printf "\tcpu hours: %.2lf\n", $cur_task->{CPU_HOURS} / 3600 if exists $cur_task->{CPU_HOURS} && $format =~ /%c/;
+    if (exists $cur_task->{RUN_TIME} && $format =~ /%r/) {
+        my $hh = $cur_task->{RUN_TIME} / 3600;
+        my $mm = ($cur_task->{RUN_TIME} % 3600) / 60;
+        my $ss = ($cur_task->{RUN_TIME} % 3600) % 60;
+        printf "\trun time: %02.0lf:%02.0lf:%02.0lf\n", $hh, $mm, $ss;
+    }
     print "\tadded time: ", ctime ($cur_task->{ADDED_TIME}) if $format =~ /%a/;
     print "\tbegin time: ", ctime ($cur_task->{BEGIN_TIME}) if exists $cur_task->{BEGIN_TIME} && $format =~ /%b/;
     print "\tend time: ", ctime ($cur_task->{END_TIME}) if exists $cur_task->{END_TIME} && $format =~ /%e/;
@@ -243,6 +252,7 @@ sub process_log {
                 $cur_task->{END_TIME} = $data{TIME};
                 $cur_task->{SIGNAL} = $data{SIGNAL};
                 $cur_task->{STATUS} = $data{STATUS};
+                $cur_task->{RUN_TIME} = $cur_task->{END_TIME} - $cur_task->{BEGIN_TIME};
 
                 my $ch = ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
                 $cur_task->{CPU_HOURS} = $ch;
@@ -264,8 +274,25 @@ sub process_log {
 
     close LOG
         or warn "$0 : failed to close input file '$filename' : $!\n";
+
+    my %result;
+    $result{USERS} = \%all_users;
+    $result{QUEUES} = \%all_queues;
+    $result{TASKS} = \@all_tasks;
+    $result{LAST} = $_;
+
+    return %result;
 }
 
 my $file_name = '../cleo-short.log';		# input file name
 
-process_log $file_name;
+#my %data = process_log $file_name;
+
+#store (\%data, 'dump');
+
+my $data = retrieve ('dump');
+#print_users $data->{USERS}, "%A%S%H%W%S%U%K";
+#print_queues $data->{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
+#print_queues $data{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
+open my($f), ">", 'yml';
+print $f, Dump($data->{USERS});
