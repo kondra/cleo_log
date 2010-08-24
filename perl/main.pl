@@ -3,10 +3,16 @@
 use strict;
 use warnings;
 
-use Storable qw(store retrieve);
-use YAML qw(Dump);
-use POSIX;
+use String::Format  qw(stringf);
+use Getopt::Std     qw(getopts);
+use Storable        qw(store retrieve);
+use POSIX           qw(mktime strftime);
 
+#===  FUNCTION  ================================================================
+#         NAME:  parse_log_record
+#   PARAMETERS:  string from log
+#      RETURNS:  hash with record parameters
+#===============================================================================
 sub parse_log_record {
     my $str = shift;
 
@@ -157,36 +163,30 @@ sub collect_stat {
     return \%stat;
 }
 
-sub time_predicate {
-    return exists $_[0]->{BEGIN_TIME} && $_[0]->{BEGIN_TIME} >= $_[1] && $_[0]->{BEGIN_TIME} <= $_[2];
-}
+sub time_predicate { exists $_[0]->{BEGIN_TIME} && $_[0]->{BEGIN_TIME} >= $_[1] && $_[0]->{BEGIN_TIME} <= $_[2]; }
 
-sub cpu_hours_predicate {
-    return exists $_[0]->{CPU_HOURS} && $_[0]->{CPU_HOURS} >= $_[1] && $_[0]->{CPU_HOURS} <= $_[2];
-}
+sub cpu_hours_predicate { exists $_[0]->{CPU_HOURS} && $_[0]->{CPU_HOURS} >= $_[1] && $_[0]->{CPU_HOURS} <= $_[2]; }
 
-sub queue_predicate {
-    return exists $_[1]->{$_[0]->{QUEUE}};
-}
+sub queue_predicate { exists $_[1]->{$_[0]->{QUEUE}}; }
 
-sub user_predicate {
-    return exists $_[1]->{$_[0]->{USER}};
-}
+sub user_predicate { exists $_[1]->{$_[0]->{USER}}; }
 
-sub np_predicate {
-    return exists $_->{NP} && $_->{NP} >= $_[1] && $_->{NP} <= $_[2];
-}
+sub np_predicate { exists $_->{NP} && $_->{NP} >= $_[1] && $_->{NP} <= $_[2]; }
 
-sub run_time_predicate {
-    return exists $_->{END_TIME} && exists $_->{BEGIN_TIME}
-            && ($_->{END_TIME} - $_->{BEGIN_TIME}) >= $_[1] && ($_->{END_TIME} - $_->{BEGIN_TIME}) <= $_[2];
-}
+sub run_time_predicate { exists $_->{END_TIME} && exists $_->{BEGIN_TIME} && ($_->{END_TIME} - $_->{BEGIN_TIME}) >= $_[1] && ($_->{END_TIME} - $_->{BEGIN_TIME}) <= $_[2]; }
 
+#===  FUNCTION  ================================================================
+#         NAME:  process_log
+#      PURPOSE:  main processing function
+#   PARAMETERS:  link to file descriptor
+#      RETURNS:  hash with tasks, users and queues
+#===============================================================================
 sub process_log {
-    my $filename = shift;
-
-    open LOG, '<', $filename
-        or die "$0 : failed to open input file '$filename' : $!\n";
+    local *LOG = shift;
+#    my $filename = shift;
+#
+#    open LOG, '<', $filename
+#        or die "$0 : failed to open input file '$filename' : $!\n";
 
     my @all_tasks;
     my %all_queues;
@@ -272,8 +272,8 @@ sub process_log {
         }
     }
 
-    close LOG
-        or warn "$0 : failed to close input file '$filename' : $!\n";
+#    close LOG
+    #       or warn "$0 : failed to close input file '$filename' : $!\n";
 
     my %result;
     $result{USERS} = \%all_users;
@@ -284,15 +284,94 @@ sub process_log {
     return %result;
 }
 
-my $file_name = '../cleo-short.log';		# input file name
+
+#===  FUNCTION  ================================================================
+#         NAME:  MAIN
+#===============================================================================
+
+#---------------------------------------------------------------------------
+#  process options
+#---------------------------------------------------------------------------
+my %options;
+
+getopts ("f:i:d:ro:hp:", \%options);
+
+#---------------------------------------------------------------------------
+#  option -i : input log file name
+#---------------------------------------------------------------------------
+my $input_filename = $options{i} if ($options{i});
+
+#---------------------------------------------------------------------------
+#  option -o : output file name
+#---------------------------------------------------------------------------
+my $output_filename = $options{o} if ($options{o});
+
+#---------------------------------------------------------------------------
+#  option -f : format string
+#---------------------------------------------------------------------------
+my $format = $options{f} if ($options{f});
+
+#---------------------------------------------------------------------------
+#  option -p : printing options
+#---------------------------------------------------------------------------
+my $format = $options{p} if ($options{p});
+
+#---------------------------------------------------------------------------
+#  option -d : binary dump file name
+#---------------------------------------------------------------------------
+if ($options{d}) {
+    my $dump_filename = $options{d};
+} else {
+    my $dump_filename = "dump";
+}
+
+#---------------------------------------------------------------------------
+#  option -h : usage
+#---------------------------------------------------------------------------
+if ($options{h}) {
+    print <<EOF;
+Usage:   clpr.pl [options]
+Options:  -h                     print this message
+          -u                     update database
+          -r                     reprocess log file and update database
+          -f string              format string for output
+          -i filename            input (cleo log) file
+          -o filename            output file (default stdout)
+          -d filename            database file (default "./dump")
+          -b dd:mm:yyyy hh:mm    begin time period (for time filter)
+          -e dd:mm:yyyy hh:mm    end time period (for time filter)
+          -p u|q|t               printing options:
+                                     u - print users
+                                     q - print queues
+                                     t - print tasks
+EOF
+    exit;
+}
+
+#---------------------------------------------------------------------------
+#  option -r : reprocess log
+#---------------------------------------------------------------------------
+if ($options{r}) {
+    unless ($options{i}) {
+        die "you should specify input file name with -i option\n";
+    }
+    open LOG, '<', $input_filename
+        or die "$0 : failed to open input file '$input_filename' : $!\n";
+
+    my %data = process_log *LOG;
+    store (\%data, "dump");
+
+    close LOG
+        or warn "$0 : failed to close input file '$input_filename' : $!\n";
+    exit;
+}
+
+
 
 #my %data = process_log $file_name;
-
 #store (\%data, 'dump');
-
-my $data = retrieve ('dump');
+#my $data = retrieve ('dump');
 #print_users $data->{USERS}, "%A%S%H%W%S%U%K";
 #print_queues $data->{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
 #print_queues $data{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
-open my($f), ">", 'yml';
-print $f, Dump($data->{USERS});
+#print Dump($data->{USERS});
