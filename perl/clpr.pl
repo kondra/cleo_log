@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-use String::Format;#  qw(stringf);
+use String::Format  qw(stringf);
 use Getopt::Std     qw(getopts);
 use Storable        qw(store retrieve);
 use POSIX           qw(mktime ctime);
@@ -60,12 +60,12 @@ sub parse_log_record {
         $res{SIGNAL} = $words[3];
         $res{QUEUE} = $req_queue;
     }
-    return %res;
+    %res;
 }
 
 #===  FUNCTION  ================================================================
 #         NAME:  print_task
-#   PARAMETERS:  task hash pointer
+#   PARAMETERS:  task hash pointer, format string
 #  DESCRIPTION:  prints task info with sprintf like formatting
 #===============================================================================
 sub print_task {
@@ -95,117 +95,62 @@ sub print_task {
     );
 
     print stringf $format, %args;
-    return;
 }
 
-#    my $cur_task = shift;
-#    my $format = shift;
-#
-#    print "\tid: ", $cur_task->{ID}, "\n" if $format =~ /%i/;
-#    print "\tqueue: ", $cur_task->{QUEUE}, "\n" if $format =~ /%q/;
-#    print "\tuser: ", $cur_task->{USER}, "\n" if $format =~ /%u/;
-#    print "\tsignal: ", $cur_task->{SIGNAL}, "\n" if exists $cur_task->{SIGNAL} && $format =~ /%s/;
-#    print "\tstatus: ", $cur_task->{STATUS}, "\n" if exists $cur_task->{STATUS} && $format =~ /%t/;
-#    print "\tnp: ", $cur_task->{NP}, "\n" if $format =~ /%n/;
-#    print "\tnp extra: ", $cur_task->{NP_EXTRA}, "\n" if exists $cur_task->{NP_EXTRA} && $format =~ /%x/;
-#    printf "\tcpu hours: %.2lf\n", $cur_task->{CPU_HOURS} / 3600 if exists $cur_task->{CPU_HOURS} && $format =~ /%c/;
-#    if (exists $cur_task->{RUN_TIME} && $format =~ /%r/) {
-#        my $hh = $cur_task->{RUN_TIME} / 3600;
-#        my $mm = ($cur_task->{RUN_TIME} % 3600) / 60;
-#        my $ss = ($cur_task->{RUN_TIME} % 3600) % 60;
-#        printf "\trun time: %02.0lf:%02.0lf:%02.0lf\n", $hh, $mm, $ss;
-#    }
-#    print "\tadded time: ", ctime ($cur_task->{ADDED_TIME}) if $format =~ /%a/;
-#    print "\tbegin time: ", ctime ($cur_task->{BEGIN_TIME}) if exists $cur_task->{BEGIN_TIME} && $format =~ /%b/;
-#    print "\tend time: ", ctime ($cur_task->{END_TIME}) if exists $cur_task->{END_TIME} && $format =~ /%e/;
-#    print "\n" if $format =~ /%[iqustnxabec]/;
-
+#===  FUNCTION  ================================================================
+#         NAME:  print_stat
+#   PARAMETERS:  stat, user or queue hash pointer, format string
+#  DESCRIPTION:  prints stat with sprintf like formatting
+#===============================================================================
 sub print_stat {
     my $stat = shift;
     my $format = shift;
 
-    print "stat: \n";
-    printf "\tcpu hours: %.2lf\n", $stat->{CPU_HOURS} / 3600 if exists $stat->{CPU_HOURS} && $format =~ /%H/;
-    if (exists $stat->{WAIT_TIME} && $format =~ /%W/) {
-        my $hh = $stat->{WAIT_TIME} / 3600;
-        my $mm = ($stat->{WAIT_TIME} % 3600) / 60;
-        my $ss = ($stat->{WAIT_TIME} % 3600) % 60;
-        printf "\twait time: %02.0lf:%02.0lf:%02.0lf\n", $hh, $mm, $ss;
-    }
-    my $cnt = @{$stat->{TASKS}};
-    print "\ttotal task count: ", $cnt, "\n" if $format =~ /%A/;
-    print "\tsucceded tasks: ", $stat->{SUCCEDED}, "\n" if exists $stat->{SUCCEDED} && $format =~ /%S/;
-    print "\tunsucceded tasks: ", $stat->{UNSUCCEDED}, "\n" if exists $stat->{UNSUCCEDED} && $format =~ /%U/;
-    print "\tkilled tasks: ", $stat->{KILLED}, "\n" if exists $stat->{KILLED} && $format =~ /%K/;
-}
-
-sub print_users {
-    my $all_users = shift;
-    my $format = shift;
-
-    my $cnt = keys %{$all_users};
-    print "users count: $cnt\n";
-
-    foreach my $cur_user (keys %{$all_users}) {
-        my $user = $all_users->{$cur_user};
-        print "user: $cur_user\n";
-        if ($format =~ /%S/) {
-            print_stat $user, $format;
-        }
-        if ($format =~ /%T/) {
-            print "tasks:\n";
-            foreach my $cur_task (@{$all_users->{$cur_user}->{TASKS}}) {
-                print_task $cur_task, $format;
+    my %args = (
+        h => sub { sprintf "%.2lf", $stat->{CPU_HOURS} / 3600 if exists $stat->{CPU_HOURS} },
+        w => sub {
+            if (exists $stat->{WAIT_TIME}) {
+                my $hh = $stat->{WAIT_TIME} / 3600;
+                my $mm = ($stat->{WAIT_TIME} % 3600) / 60;
+                my $ss = ($stat->{WAIT_TIME} % 3600) % 60;
+                sprintf "%02.0lf:%02.0lf:%02.0lf", $hh, $mm, $ss;
             }
-        }
-        print "\n";
-    }
+        },
+        a => sub { my $cnt = $stat->{TASKS} },
+        s => sub { $stat->{SUCCEDED} if exists $stat->{SUCCEDED} },
+        u => sub { $stat->{UNSUCCEDED} if exists $stat->{UNSUCCEDED} },
+        k => sub { $stat->{KILLED} if exists $stat->{KILLED} },
+    );
+
+    print stringf $format, %args;
 }
 
-sub print_queues {
-    my $all_queues = shift;
-    my $format = shift;
-
-    my $cnt = keys %{$all_queues};
-    print "queues count: $cnt\n";
-
-    foreach my $cur_queue (keys %{$all_queues}) {
-        print "queue: $cur_queue\n";
-        if ($format =~ /%T/) {
-            print "tasks:\n";
-            foreach my $cur_task (@{$all_queues->{$cur_queue}->{TASKS}}) {
-                print_task $cur_task, $format;
-            }
-        }
-        print "\n";
-    }
-}
-
+#===  FUNCTION  ================================================================
+#         NAME:  collect_stat
+#      PURPOSE:  collect statistic from array of tasks
+#   PARAMETERS:  task array pointer
+#      RETURNS:  stat hash pointer
+#===============================================================================
 sub collect_stat {
     my $tasks = shift;
     my %stat;
+    my $i = 0;
 
-    $stat{TASKS} = $tasks;
     foreach my $cur_task (@$tasks) {
-        $stat{CPU_HOURS} += $cur_task->{CPU_HPURS};
-        $stat{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
-        $stat{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
-        $stat{KILLED}++ if ($cur_task->{SIGNAL});
+        if (defined $cur_task->{USED}) {
+            $stat{WAIT_TIME} += $cur_task->{BEGIN_TIME} - $cur_task->{ADDED_TIME} if exists $cur_task->{BEGIN_TIME};
+            $stat{CPU_HOURS} += $cur_task->{CPU_HOURS} if exists $cur_task->{CPU_HOURS};
+            if (exists $cur_task->{SIGNAL} && exists $cur_task->{SIGNAL}) {
+                $stat{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{STATUS} == 0);
+                $stat{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{STATUS});
+                $stat{KILLED}++ if ($cur_task->{SIGNAL});
+            }
+            $i++;
+        }
     }
-    return \%stat;
+    $stat{TASKS} = $i;
+    \%stat;
 }
-
-sub time_predicate { exists $_[0]->{BEGIN_TIME} && $_[0]->{BEGIN_TIME} >= $_[1] && $_[0]->{BEGIN_TIME} <= $_[2]; }
-
-sub cpu_hours_predicate { exists $_[0]->{CPU_HOURS} && $_[0]->{CPU_HOURS} >= $_[1] && $_[0]->{CPU_HOURS} <= $_[2]; }
-
-sub queue_predicate { exists $_[1]->{$_[0]->{QUEUE}}; }
-
-sub user_predicate { exists $_[1]->{$_[0]->{USER}}; }
-
-sub np_predicate { exists $_->{NP} && $_->{NP} >= $_[1] && $_->{NP} <= $_[2]; }
-
-sub run_time_predicate { exists $_->{END_TIME} && exists $_->{BEGIN_TIME} && ($_->{END_TIME} - $_->{BEGIN_TIME}) >= $_[1] && ($_->{END_TIME} - $_->{BEGIN_TIME}) <= $_[2]; }
 
 #===  FUNCTION  ================================================================
 #         NAME:  process_log
@@ -237,6 +182,7 @@ sub process_log {
             }
 #
             $cur_task{ADDED_TIME} = $data{TIME};
+            $cur_task{USED} = undef;
 
             push @all_tasks, \%cur_task;
             
@@ -305,10 +251,37 @@ sub process_log {
     $result{QUEUES} = \%all_queues;
     $result{TASKS} = \@all_tasks;
     $result{LAST} = $_;
+    $result{LAST_POS} = tell LOG;
 
-    return %result;
+    %result;
 }
 
+#===  FUNCTION  ================================================================
+#         NAME:  load_format
+#   PARAMETERS:  filename
+#      RETURNS:  format string
+#===============================================================================
+sub load_format {
+    my $filename = shift;
+    my $format;
+
+    open FORMAT, '<', $filename
+        or die "$0 : failed to open input file '$filename' : $!\n";
+
+    while (<FORMAT>) {
+        chomp ($format .= $_);
+    }
+
+    $_ = $format;
+    s/\\n/\n/g;
+    s/\\t/\t/g;
+    $format = $_;
+
+    close FORMAT
+        or warn "$0 : failed to close input file '$filename' : $!\n";
+
+    $format;
+}
 
 #===  FUNCTION  ================================================================
 #         NAME:  MAIN
@@ -316,33 +289,20 @@ sub process_log {
 my %data;
 
 my $dump_filename = "dump";
-my $format_filename = "format";
+my $task_format_filename = "taskformat";
+my $stat_format_filename = "statformat";
 
 #---------------------------------------------------------------------------
 #  process options
 #---------------------------------------------------------------------------
 my %options;
 
-getopts ("f:i:d:ruo:hp:", \%options);
+getopts ("b:e:n:c:q:s:t:i:d:ruo:hp:", \%options);
 
-#---------------------------------------------------------------------------
-#  option -i : input log file name
-#---------------------------------------------------------------------------
 my $input_filename = $options{i} if ($options{i});
 
-#---------------------------------------------------------------------------
-#  option -f : format string filename
-#---------------------------------------------------------------------------
-$format_filename = $options{f} if ($options{f});
-
-#---------------------------------------------------------------------------
-#  option -p : printing options
-#---------------------------------------------------------------------------
 my $print = $options{p} if ($options{p});
 
-#---------------------------------------------------------------------------
-#  option -d : binary dump file name
-#---------------------------------------------------------------------------
 $dump_filename = $options{d} if ($options{d});
 
 #---------------------------------------------------------------------------
@@ -355,7 +315,6 @@ Global Options:
           -h                                print this message
           -u                                update database
           -r                                reprocess log file and update database
-          -f filename                       filename with format strings for task, queue and user stats (default "./format")
           -i filename                       input (cleo log) file
           -d filename                       database file (default "./dump")
           -p u|q|t                          printing options:
@@ -367,7 +326,7 @@ Filtering Options:
           -e dd:mm:yyyy hh:mm               end time period (for time filter)
           -n np_min-np_max                  np range
           -c cpuh_min-cpuh_max              cpuh_min, cpuh_max - floating point values
-          -qaqueue1,..,queueN               queue list
+          -q queue1,..,queueN               queue list
           -s user1,..,userN                 users list
           -t run_time_min-run_time_max      run_time_* - run time range in seconds
 EOF
@@ -403,17 +362,16 @@ close LOG
 #  option -p : printing
 #---------------------------------------------------------------------------
 if ($options{p}) {
-    my $begin_period = 0;
-    my $end_period = 2000000000;
-    my $np_min = 0;
-    my $np_max = 1000000;
-    my $ch_min = 0;
-    my $ch_max = 20000000000;
-    my $rt_min = 0;
-    my $rt_max = 20000000000;
-    my @user_list;
-    my @queue_list;
-    my $format;
+    my $begin_period;
+    my $end_period;
+    my $np_min;
+    my $np_max;
+    my $ch_min;
+    my $ch_max;
+    my $rt_min;
+    my $rt_max;
+    my %user_list;
+    my %queue_list;
 
     my $sp = sub {
         my $str = shift;
@@ -460,47 +418,75 @@ if ($options{p}) {
 
     #  users list
     if ($options{s}) {
-        @user_list = split /,/, $options{s};
+        my @tmp = split /,/, $options{s};
+        $user_list{$_} = 1 foreach (@tmp);
     }
 
     #  queue list
     if ($options{q}) {
-        @queue_list = split /,/, $options{q};
+        my @tmp = split /,/, $options{q};
+        $queue_list{$_} = 1 foreach (@tmp);
     }
 
-    #  read format string
-    open FORMAT, '<', $format_filename
-        or die "$0 : failed to open input file '$format_filename' : $!\n";
+    #  read task format string
+    my $task_format = load_format $task_format_filename;
+    #  read stat format string
+    my $stat_format = load_format $stat_format_filename;
 
-    while (<FORMAT>) {
-        chomp ($format .= $_);
-    }
+    my @tasks = @{$data{TASKS}};
 
-    $_ = $format;
-    s/\\n/\n/g;
-    s/\\t/\t/g;
-    $format = $_;
+    sub time_predicate { exists $_[0]->{BEGIN_TIME} && $_[0]->{BEGIN_TIME} >= $_[1] && $_[0]->{BEGIN_TIME} <= $_[2]; }
+    sub cpu_hours_predicate { exists $_[0]->{CPU_HOURS} && $_[0]->{CPU_HOURS} >= $_[1] && $_[0]->{CPU_HOURS} <= $_[2]; }
+    sub queue_predicate { exists $_[1]->{$_[0]->{QUEUE}}; }
+    sub user_predicate { exists $_[1]->{$_[0]->{USER}}; }
+    sub np_predicate { exists $_->{NP} && $_->{NP} >= $_[1] && $_->{NP} <= $_[2]; }
+    sub run_time_predicate { exists $_->{END_TIME} && exists $_->{BEGIN_TIME} && ($_->{END_TIME} - $_->{BEGIN_TIME}) >= $_[1] && ($_->{END_TIME} - $_->{BEGIN_TIME}) <= $_[2]; }
+
+    @tasks = grep time_predicate ($_, $begin_period, $end_period), @tasks if defined $begin_period && defined $end_period;
+    @tasks = grep np_predicate ($_, $np_min, $np_max), @tasks if defined $np_min && defined $np_max;
+    @tasks = grep cpu_hours_predicate ($_, $ch_min, $ch_max), @tasks if defined $ch_min && defined $ch_max;
+    @tasks = grep run_time_predicate ($_, $rt_min, $rt_max), @tasks if defined $rt_min && defined $rt_max;
+    @tasks = grep user_predicate ($_, \%user_list), @tasks if %user_list;
+    @tasks = grep queue_predicate ($_, \%queue_list), @tasks if %queue_list;
+
+    $_->{USED} = 1 foreach (@tasks);
     
-# or like this
-# my $format = "Task info:\n\tid: %i\n\tqueue: %q\n\tuser: %u\n\tsignal: %s\n\tstatus: %t\n\tnp: %n\n\tnp extra: %x\n\tcpu hours: %.2c\n\trun time: %r\n\tadded time: %a\tbegin time: %b\tend time: %e\n";
+    if ($print eq 't') {
+        my $stat = collect_stat \@tasks;
+        print_stat $stat, $stat_format;
+        print_task $_, $task_format foreach (@tasks);
+        exit;
+    }
 
-    close FORMAT
-        or warn "$0 : failed to close input file '$format_filename' : $!\n";
+    if ($print eq 'u') {
+        my $all_users = $data{USERS};
+        foreach (keys %$all_users) {
+            if (exists $user_list{$_}) {
+                my $tasks = $all_users->{$_}->{TASKS};
+                my $stat = collect_stat $tasks;
+                print "User name: $_\n";
+                print_stat $stat, $stat_format;
+                foreach (@$tasks) {
+                    print_task $_, $task_format if (defined $_->{USED});
+                }
+            }
+        }
+        exit;
+    }
 
-#    foreach my $cur_task ($data->{TASKS}) {
-#        print_task $cur_task, $format;
-#    }
-    my $all_users = $data{USERS};
-    foreach my $cur_task (@{$all_users->{burunduk}->{TASKS}}) {
-        print_task $cur_task, $format;
+    if ($print eq 'q') {
+        my $all_queues = $data{QUEUES};
+        foreach (keys %$all_queues) {
+            if (exists $queue_list{$_}) {
+                my $tasks = $all_queues->{$_}->{TASKS};
+                my $stat = collect_stat $tasks;
+                print "Queue name: $_\n";
+                print_stat $stat, $stat_format;
+                foreach (@$tasks) {
+                    print_task $_, $task_format if (defined $_->{USED});
+                }
+            }
+        }
+        exit;
     }
 }
-
-
-#my %data = process_log $file_name;
-#store (\%data, 'dump');
-#my $data = retrieve ('dump');
-#print_users $data->{USERS}, "%A%S%H%W%S%U%K";
-#print_queues $data->{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
-#print_queues $data{QUEUES}, "%T%r%i%q%u%s%t%n%x%c%a%b%e";
-#print Dump($data->{USERS});
