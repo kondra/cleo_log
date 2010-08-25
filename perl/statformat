@@ -1,0 +1,7 @@
+Stat:\n
+\tcpu hours: %h\n
+\twait time: %w\n
+\ttotal task count: %a\n
+\tsucceded tasks: %s\n
+\tunsucceded tasks: %u\n
+\tkilled tasks: %k\n
