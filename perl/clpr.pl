@@ -218,7 +218,7 @@ sub process_log {
                 my $cur_user = $all_users{$cur_task->{USER}};
                 $cur_user->{WAIT_TIME} += $cur_task->{BEGIN_TIME} - $cur_task->{ADDED_TIME};
             } else {
-#                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
+                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
             }
         } elsif ($data{MSG_TYPE} eq "END_TASK") {
             if (exists $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}}) {
@@ -241,7 +241,7 @@ sub process_log {
                 $cur_queue->{UNSUCCEDED}++, $cur_user->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
                 $cur_queue->{KILLED}++, $cur_user->{KILLED}++ if ($cur_task->{SIGNAL});
             } else {
-#                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
+                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
             }
         }
     }
