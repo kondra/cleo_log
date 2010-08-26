@@ -120,6 +120,8 @@ sub print_stat {
         s => sub { $stat->{SUCCEDED} if exists $stat->{SUCCEDED} },
         u => sub { $stat->{UNSUCCEDED} if exists $stat->{UNSUCCEDED} },
         k => sub { $stat->{KILLED} if exists $stat->{KILLED} },
+        d => sub { $stat->{DELETED} if exists $stat->{DELETED} },
+        D => sub { $stat->{DELETED_BEFORE_RUN} if exists $stat->{DELETED} },
     );
 
     print stringf $format, %args;
@@ -136,6 +138,8 @@ sub collect_stat {
     my %stat;
     my $i = 0;
 
+    $stat{DELETED} = $stat{DELETED_BEFORE_RUN} = 0;
+
     foreach my $cur_task (@$tasks) {
         if (defined $cur_task->{USED}) {
             $stat{WAIT_TIME} += $cur_task->{BEGIN_TIME} - $cur_task->{ADDED_TIME} if exists $cur_task->{BEGIN_TIME};
@@ -145,6 +149,8 @@ sub collect_stat {
                 $stat{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{STATUS});
                 $stat{KILLED}++ if ($cur_task->{SIGNAL});
             }
+            $stat{DELETED}++ if (exists $cur_task->{DEL});
+            $stat{DELETED_BEFORE_RUN}++ if (exists $cur_task->{DEL_BEFORE_RUN});
             $i++;
         }
     }
@@ -160,35 +166,52 @@ sub collect_stat {
 #===============================================================================
 sub process_log {
     local *LOG = shift;
+    my $result = shift;
 
-    my @all_tasks;
-    my %all_queues;
-    my %all_users;
+    my ($all_tasks, $all_queues, $all_users);
+    my (@new_tasks, %new_queues, %new_users);
 
+    if (exists $result->{TASKS}) {
+        $all_tasks = $result->{TASKS};
+    } else {
+        $result->{TASKS} = $all_tasks = \@new_tasks;
+    }
+
+    if (exists $result->{QUEUES}) {
+        $all_queues = $result->{QUEUES}
+    } else {
+        $result->{QUEUES} = $all_queues = \%new_queues;
+    }
+
+    if (exists $result->{USERS}) {
+        $all_users = $result->{USERS}
+    } else {
+        $result->{USERS} = $all_users = \%new_users;
+    }
+
+    my $prev_pos = tell LOG;
     my $i = 0;
     while (<LOG>) {
         $i++;
+#        last if ($i > 50000);
+        $result->{LAST_POS} = $prev_pos;
+        $result->{LAST} = $_;
+
         my %cur_task;
         my %data = parse_log_record $_;
         if ($data{MSG_TYPE} eq "ADDED") {
             $cur_task{ID} = $data{ID};
             $cur_task{USER} = $data{USER};
             $cur_task{QUEUE} = $data{QUEUE};
-# what is "1-as" "1-"
-            if ($data{NP} =~ /(\d+)-/) {
-                $cur_task{NP} = $1;
-            } else {
-                $cur_task{NP} = $data{NP};
-            }
-#
+            $cur_task{NP} = $1 if ($data{NP} =~ /(\d+)-?/); # what is "1-as" "1-"
             $cur_task{ADDED_TIME} = $data{TIME};
             $cur_task{USED} = undef;
 
-            push @all_tasks, \%cur_task;
+            push @$all_tasks, \%cur_task;
             
-            if (exists $all_queues{$cur_task{QUEUE}}) {
-                push @{$all_queues{$cur_task{QUEUE}}->{TASKS}}, \%cur_task;
-                $all_queues{$cur_task{QUEUE}}->{TASKS_HASH}->{$cur_task{ID}} = \%cur_task;
+            if (exists $all_queues->{$cur_task{QUEUE}}) {
+                push @{$all_queues->{$cur_task{QUEUE}}->{TASKS}}, \%cur_task;
+                $all_queues->{$cur_task{QUEUE}}->{TASKS_HASH}->{$cur_task{ID}} = \%cur_task;
             } else {
                 my %new_queue;
                 my @queue_tasks;
@@ -197,63 +220,80 @@ sub process_log {
                 $queue_tasks_hash{$cur_task{ID}} = \%cur_task;
                 $new_queue{TASKS} = \@queue_tasks;
                 $new_queue{TASKS_HASH} = \%queue_tasks_hash;
-                $all_queues{$cur_task{QUEUE}} = \%new_queue;
+                $all_queues->{$cur_task{QUEUE}} = \%new_queue;
             }
 
-            if (exists $all_users{$cur_task{USER}}) {
-                push @{$all_users{$cur_task{USER}}->{TASKS}}, \%cur_task;
+            if (exists $all_users->{$cur_task{USER}}) {
+                push @{$all_users->{$cur_task{USER}}->{TASKS}}, \%cur_task;
             } else {
                 my %new_user;
                 my @user_tasks;
                 push @user_tasks, \%cur_task;
                 $new_user{TASKS} = \@user_tasks;
-                $all_users{$cur_task{USER}} = \%new_user;
+                $all_users->{$cur_task{USER}} = \%new_user;
             }
         } elsif ($data{MSG_TYPE} eq "RUN_NODES") {
-            if (exists $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}}) {
-                my $cur_task = $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}};
+            if (exists $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}}) {
+                my $cur_task = $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}};
                 $cur_task->{BEGIN_TIME} = $data{TIME};
                 $cur_task->{NP_EXTRA} = $data{NP_EXTRA};
 
-                my $cur_user = $all_users{$cur_task->{USER}};
+                my $cur_user = $all_users->{$cur_task->{USER}};
                 $cur_user->{WAIT_TIME} += $cur_task->{BEGIN_TIME} - $cur_task->{ADDED_TIME};
             } else {
-                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
+                warn "RUN_NODES: task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
             }
         } elsif ($data{MSG_TYPE} eq "END_TASK") {
-            if (exists $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}}) {
-                my $cur_task = $all_queues{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}};
+            if (exists $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}}) {
+                my $cur_task = $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$data{ID}};
                 $cur_task->{END_TIME} = $data{TIME};
                 $cur_task->{SIGNAL} = $data{SIGNAL};
                 $cur_task->{STATUS} = $data{STATUS};
-                $cur_task->{RUN_TIME} = $cur_task->{END_TIME} - $cur_task->{BEGIN_TIME};
 
-                my $ch = ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
-                $cur_task->{CPU_HOURS} = $ch;
+                my $cur_user = $all_users->{$cur_task->{USER}};
+                my $cur_queue = $all_queues->{$cur_task->{QUEUE}};
 
-                my $cur_user = $all_users{$cur_task->{USER}};
-                my $cur_queue = $all_queues{$cur_task->{QUEUE}};
+                if (defined $cur_task->{BEGIN_TIME}) {
+                    $cur_task->{RUN_TIME} = $cur_task->{END_TIME} - $cur_task->{BEGIN_TIME};
 
-                $cur_user->{CPU_HOURS} += $ch;
-                $cur_queue->{CPU_HOURS} += $ch;
+                    my $ch = ($cur_task->{END_TIME} - $cur_task->{BEGIN_TIME}) * $cur_task->{NP};
+                    $cur_task->{CPU_HOURS} = $ch;
 
-                $cur_queue->{SUCCEDED}++, $cur_user->{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
-                $cur_queue->{UNSUCCEDED}++, $cur_user->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
-                $cur_queue->{KILLED}++, $cur_user->{KILLED}++ if ($cur_task->{SIGNAL});
+                    $cur_user->{CPU_HOURS} += $ch;
+                    $cur_queue->{CPU_HOURS} += $ch;
+
+                    $cur_queue->{SUCCEDED}++, $cur_user->{SUCCEDED}++ if ($cur_task->{SIGNAL} == 0 && $cur_task->{SIGNAL} == 0);
+                    $cur_queue->{UNSUCCEDED}++, $cur_user->{UNSUCCEDED}++ if ($cur_task->{SIGNAL} || $cur_task->{SIGNAL});
+                    $cur_queue->{KILLED}++, $cur_user->{KILLED}++ if ($cur_task->{SIGNAL});
+                } else {
+                    $cur_task->{DEL_BEFORE_RUN} = 1;
+                    $cur_user->{DELETED_BEFORE_RUN}++;
+                    $cur_queue->{DELETED_BEFORE_RUN}++;
+                }
             } else {
-                warn "task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
+                warn "END_TASK: task with id '$data{ID}' from queue '$data{QUEUE}' doesn't exist in database\n";
+            }
+        } elsif ($data{MSG_TYPE} eq "DEL") {
+            next if $data{ID} =~ /(all)|(-q)/; #what is id,-q,queue_name ; all ; all,-q,queue_name
+            my @id = split /,/, $data{ID};
+
+            foreach (@id) {
+                if (exists $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$_}) {
+                    my $cur_task = $all_queues->{$data{QUEUE}}->{TASKS_HASH}->{$_};
+                    my $cur_user = $all_users->{$cur_task->{USER}};
+                    my $cur_queue = $all_queues->{$cur_task->{QUEUE}};
+
+                    $cur_task->{DEL} = 1;
+                    $cur_user->{DELETED}++;
+                    $cur_queue->{DELETED}++;
+                } else {
+                    warn "DEL: task with id '$_' from queue '$data{QUEUE}' doesn't exist in database\n";
+                }
             }
         }
+        $prev_pos = tell LOG;
     }
-
-    my %result;
-    $result{USERS} = \%all_users;
-    $result{QUEUES} = \%all_queues;
-    $result{TASKS} = \@all_tasks;
-    $result{LAST} = $_;
-    $result{LAST_POS} = tell LOG;
-
-    %result;
+    $result;
 }
 
 #===  FUNCTION  ================================================================
@@ -265,20 +305,16 @@ sub load_format {
     my $filename = shift;
     my $format;
 
-    open FORMAT, '<', $filename
-        or die "$0 : failed to open input file '$filename' : $!\n";
+    open FORMAT, '<', $filename or die "$0 : failed to open input file '$filename' : $!\n";
 
     while (<FORMAT>) {
         chomp ($format .= $_);
     }
 
-    $_ = $format;
-    s/\\n/\n/g;
-    s/\\t/\t/g;
-    $format = $_;
+    $format =~ s/\\n/\n/g;
+    $format =~ s/\\t/\t/g;
 
-    close FORMAT
-        or warn "$0 : failed to close input file '$filename' : $!\n";
+    close FORMAT or warn "$0 : failed to close input file '$filename' : $!\n";
 
     $format;
 }
@@ -288,7 +324,6 @@ sub load_format {
 #===============================================================================
 my %data;
 
-my $dump_filename = "dump";
 my $task_format_filename = "taskformat";
 my $stat_format_filename = "statformat";
 
@@ -297,13 +332,12 @@ my $stat_format_filename = "statformat";
 #---------------------------------------------------------------------------
 my %options;
 
-getopts ("b:e:n:c:q:s:t:i:d:ruo:hp:", \%options);
+getopts ("kb:e:n:c:q:s:t:i:d:ruo:hp:", \%options);
+
+my $dump_filename = "dump";
+$dump_filename = $options{d} if ($options{d});
 
 my $input_filename = $options{i} if ($options{i});
-
-my $print = $options{p} if ($options{p});
-
-$dump_filename = $options{d} if ($options{d});
 
 #---------------------------------------------------------------------------
 #  option -h : usage
@@ -321,6 +355,7 @@ Global Options:
                                                 u - print users
                                                 q - print queues
                                                 t - print tasks
+          -k                                print tasks (only when '-p u' or '-p q')
 Filtering Options:
           -b dd:mm:yyyy hh:mm               begin time period (for time filter)
           -e dd:mm:yyyy hh:mm               end time period (for time filter)
@@ -337,39 +372,48 @@ EOF
 #  option -u : update database 
 #---------------------------------------------------------------------------
 if ($options{u}) {
+    exists $options{i} or die "you should specify input file name with -i option\n";
+
     %data = %{retrieve ($dump_filename)};
+
+    open LOG, '<', $input_filename or die "$0 : failed to open input file '$input_filename' : $!\n";
+
+    seek LOG, $data{LAST_POS}, 0;
+    $_ = <LOG>;
+    if ($_ ne $data{LAST}) {
+        seek LOG, 0, 0;
+    }
+
+    %data = %{process_log *LOG, \%data};
+    store \%data, "dump";
+
+    close LOG or warn "$0 : failed to close input file '$input_filename' : $!\n";
 }
 
 #---------------------------------------------------------------------------
 #  option -r : reprocess log
 #---------------------------------------------------------------------------
 if ($options{r}) {
-    unless (exists $options{i}) {
-        die "you should specify input file name with -i option\n";
-    }
+    exists $options{i} or die "you should specify input file name with -i option\n";
 
-    open LOG, '<', $input_filename
-        or die "$0 : failed to open input file '$input_filename' : $!\n";
+    open LOG, '<', $input_filename or die "$0 : failed to open input file '$input_filename' : $!\n";
 
-    %data = process_log *LOG;
+    %data = %{process_log *LOG, \%data};
     store \%data, "dump";
 
-close LOG
-    or warn "$0 : failed to close input file '$input_filename' : $!\n";
+    print $data{LAST};
+
+    close LOG or warn "$0 : failed to close input file '$input_filename' : $!\n";
 }
 
 #---------------------------------------------------------------------------
 #  option -p : printing
 #---------------------------------------------------------------------------
 if ($options{p}) {
-    my $begin_period;
-    my $end_period;
-    my $np_min;
-    my $np_max;
-    my $ch_min;
-    my $ch_max;
-    my $rt_min;
-    my $rt_max;
+    #retreive stored data
+    %data = %{retrieve ($dump_filename)} unless ($options{r} || $options{u});
+
+    my ($begin_period, $end_period, $np_min, $np_max, $ch_min, $ch_max, $rt_min, $rt_max);
     my %user_list;
     my %queue_list;
 
@@ -451,21 +495,24 @@ if ($options{p}) {
 
     $_->{USED} = 1 foreach (@tasks);
     
-    if ($print eq 't') {
+    if ($options{p} eq 't') {
         my $stat = collect_stat \@tasks;
         print_stat $stat, $stat_format;
         print_task $_, $task_format foreach (@tasks);
         exit;
     }
 
-    if ($print eq 'u') {
+    if ($options{p} eq 'u') {
         my $all_users = $data{USERS};
         foreach (keys %$all_users) {
-            if (exists $user_list{$_}) {
-                my $tasks = $all_users->{$_}->{TASKS};
-                my $stat = collect_stat $tasks;
-                print "User name: $_\n";
-                print_stat $stat, $stat_format;
+            next if (!exists $user_list{$_} && %user_list);
+
+            my $tasks = $all_users->{$_}->{TASKS};
+            my $stat = collect_stat $tasks;
+
+            print "User name: $_\n";
+            print_stat $stat, $stat_format;
+            if ($options{k}) {
                 foreach (@$tasks) {
                     print_task $_, $task_format if (defined $_->{USED});
                 }
@@ -474,14 +521,17 @@ if ($options{p}) {
         exit;
     }
 
-    if ($print eq 'q') {
+    if ($options{p} eq 'q') {
         my $all_queues = $data{QUEUES};
         foreach (keys %$all_queues) {
-            if (exists $queue_list{$_}) {
-                my $tasks = $all_queues->{$_}->{TASKS};
-                my $stat = collect_stat $tasks;
-                print "Queue name: $_\n";
-                print_stat $stat, $stat_format;
+            next if (!exists $queue_list{$_} && $options{q});
+
+            my $tasks = $all_queues->{$_}->{TASKS};
+            my $stat = collect_stat $tasks;
+
+            print "Queue name: $_\n";
+            print_stat $stat, $stat_format;
+            if ($options{k}) {
                 foreach (@$tasks) {
                     print_task $_, $task_format if (defined $_->{USED});
                 }
